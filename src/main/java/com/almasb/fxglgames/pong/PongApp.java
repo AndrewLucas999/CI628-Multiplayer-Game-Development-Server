@@ -32,6 +32,7 @@ import com.almasb.fxgl.app.GameApplication;
 import com.almasb.fxgl.app.GameSettings;
 import com.almasb.fxgl.core.collection.PropertyMap;
 import com.almasb.fxgl.core.math.FXGLMath;
+import com.almasb.fxgl.dsl.components.EffectComponent;
 import com.almasb.fxgl.entity.Entity;
 import com.almasb.fxgl.entity.SpawnData;
 import com.almasb.fxgl.input.UserAction;
@@ -49,6 +50,7 @@ import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.util.Arrays;
 import java.util.Map;
+import java.util.Timer;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 
@@ -78,12 +80,9 @@ public class PongApp extends GameApplication implements MessageHandler<String> {
     private Entity powerUp;
     private BatComponent player1Bat;
     private BatComponent player2Bat;
-
-//    private Connection[] playerConnection;
     private Connection player1Connection;
     private Connection player2Connection;
     private Server<String> server;
-
     @Override
     protected void initInput() {
         getInput().addAction(new UserAction("Up1") {
@@ -172,7 +171,6 @@ public class PongApp extends GameApplication implements MessageHandler<String> {
 
         server.setOnConnected(connection -> {
             connection.addMessageHandlerFX(this);
-            //TODO - Gets Local session data. Use this to identify Device / Player and Usingthis to enable powerups for specific
             //TODO - connection.
             // Check if connection has already been made
             if(player1Connection == null){
@@ -186,9 +184,6 @@ public class PongApp extends GameApplication implements MessageHandler<String> {
             else{
                 connection.terminate();
             }
-
-//            connection.getLocalSessionData();
-
         });
 
         getGameWorld().addEntityFactory(new PongFactory());
@@ -243,11 +238,31 @@ public class PongApp extends GameApplication implements MessageHandler<String> {
         // Handling physics for PowerUp and Bat
         CollisionHandler batPowerUpHandler = new CollisionHandler(EntityType.POWERUP, EntityType.PLAYER_BAT) {
             @Override
-            protected void onCollisionBegin(Entity a, Entity bat) {
+            protected void onCollisionBegin(Entity powerUp, Entity bat) {
                 // TODO - destroy ball as it is absorbed
                 playHitAnimation(bat);
-                a.removeFromWorld();
+                powerUp.removeFromWorld();
+                // Sends Ball is destroyed cmd
+                server.broadcast("POWERUP_DESTROYED");
+                // Parameter list, arrow, body of function
+                // Not expecting any parameter to return
+                // Lambda is known as anonymous
+                // JavaFx: Shapes, Animation, Lambda Expressions
+                // Passing in something
+                // runOnce doesn't expect any parameters
+                runOnce(() -> {
+                    spawnPowerUp();
+                }, Duration.seconds(7));
+                if (bat == player1){
+                    var speedUpEffect = new SpeedUpEffect(Duration.millis(3000));
+                    bat.getComponent(EffectComponent.class).startEffect(speedUpEffect);
+                }
+                else if(bat == player2){
+                    var speedUpEffect = new SpeedUpEffect(Duration.millis(3000));
+                    bat.getComponent(EffectComponent.class).startEffect(speedUpEffect);
+                }
                 server.broadcast(bat == player1 ? POWERUP_HIT_BAT1 : POWERUP_HIT_BAT2);
+
             }
         };
 
@@ -270,13 +285,11 @@ public class PongApp extends GameApplication implements MessageHandler<String> {
         getGameScene().addUI(ui);
     }
 
-    // TODO - Send bat x position within game data
     @Override
     protected void onUpdate(double tpf) {
         if (!server.getConnections().isEmpty()) {
             var message = "GAME_DATA," + player1.getX() + "," + player1.getY() + "," + player2.getX() + "," +
                     player2.getY() + "," + ball.getX() + "," + ball.getY() + "," + ball.getDouble("radius") ;
-//                    powerUp.getX() + "," + powerUp.getY() + "," + powerUp.getDouble("powerUpRadius");
 
             // When the power up ball is still active it will send the coordinates and radius of power up
             if(powerUp.isActive()){
@@ -285,11 +298,6 @@ public class PongApp extends GameApplication implements MessageHandler<String> {
                 server.broadcast(powerUpMessage);
             }
             server.broadcast(message);
-            // TODO - Will send just the value
-            // TODO - Send the radius only when connection is made
-//            server.getConnections().get(0).send("5");
-
-
         }
     }
 
@@ -305,17 +313,23 @@ public class PongApp extends GameApplication implements MessageHandler<String> {
     private void initGameObjects() {
         // setting radius
         double radius = 30;
-        double powerUpRadius = 30;
         ball = spawn("ball", new SpawnData(getAppWidth() / 2 - 5 , getAppHeight() / 2 - 5).put("radius", radius));
         player1 = spawn("bat", new SpawnData(getAppWidth() / 4, getAppHeight() / 2 - 30).put("isPlayer", true));
         player2 = spawn("bat", new SpawnData(3 * getAppWidth() / 4 - 20, getAppHeight() / 2 - 30).put("isPlayer", false));
-        powerUp = spawn("powerUp", new SpawnData(getAppWidth()/2 - powerUpRadius , getAppHeight() / 2 - powerUpRadius).put("powerUpRadius", powerUpRadius));
+
+        // Initialise spawning powerup
+        spawnPowerUp();
 
         player1Bat = player1.getComponent(BatComponent.class);
         player2Bat = player2.getComponent(BatComponent.class);
 
     }
 
+    private void spawnPowerUp(){
+        double powerUpRadius = 30;
+        server.broadcast("POWERUP_CREATED");
+        powerUp = spawn("powerUp", new SpawnData(getAppWidth()/2 - powerUpRadius , getAppHeight() / 2 - powerUpRadius).put("powerUpRadius", powerUpRadius));
+    }
     /// Animation for the recoil animation after being hit for a bat
     private void playHitAnimation(Entity bat) {
         animationBuilder()
@@ -349,9 +363,9 @@ public class PongApp extends GameApplication implements MessageHandler<String> {
             }
             else if(connection.getLocalSessionData().getString("ID") == "ID2"){
                 if(key.endsWith("_DOWN")) {
-                    if (key.substring(0, 1).contains("W")) {
+                    if (key.substring(0, 1).contains("I")) {
                         getInput().mockKeyPress(KeyCode.valueOf(key.substring(0, 1)));
-                    } else if (key.substring(0, 1).contains("S")) {
+                    } else if (key.substring(0, 1).contains("K")) {
                         getInput().mockKeyPress(KeyCode.valueOf(key.substring(0, 1)));
                     }
                 }

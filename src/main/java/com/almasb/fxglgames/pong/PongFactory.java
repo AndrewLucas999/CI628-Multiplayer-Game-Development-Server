@@ -26,6 +26,7 @@
 
 package com.almasb.fxglgames.pong;
 
+import com.almasb.fxgl.dsl.components.EffectComponent;
 import com.almasb.fxgl.entity.Entity;
 import com.almasb.fxgl.entity.EntityFactory;
 import com.almasb.fxgl.entity.SpawnData;
@@ -106,6 +107,8 @@ public class PongFactory implements EntityFactory {
                 .with(new CollidableComponent(true))
                 .with(physics)
                 .with(new BatComponent())
+                // Component is the bridge between the entity
+                .with(new EffectComponent())
                 .build();
     }
 
@@ -114,7 +117,9 @@ public class PongFactory implements EntityFactory {
         PhysicsComponent physics = new PhysicsComponent();
         physics.setBodyType(BodyType.DYNAMIC);
         physics.setFixtureDef(new FixtureDef().density(0.3f).restitution(1.0f));
-        physics.setOnPhysicsInitialized(() -> physics.setLinearVelocity(5 * 30, -5 * 30));
+        // min and max
+        double value = random(-80, 80);
+        physics.setOnPhysicsInitialized(() -> physics.setLinearVelocity(5 * value, -5 * value));
         return entityBuilder(data)
                 .type(EntityType.POWERUP)
                 .bbox(new HitBox(BoundingShape.circle(data.get("powerUpRadius"))))

@@ -35,7 +35,13 @@ import com.almasb.fxgl.physics.PhysicsComponent;
  */
 public class BatComponent extends Component {
 
-    private static final double BAT_SPEED = 420;
+    private double BAT_SPEED = 420;
+    public double getBAT_SPEED() {
+        return BAT_SPEED;
+    }
+    public void setBAT_SPEED(double BAT_SPEED) {
+        this.BAT_SPEED = BAT_SPEED;
+    }
 
     protected PhysicsComponent physics;
 
